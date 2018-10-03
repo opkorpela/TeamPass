@@ -539,6 +539,25 @@ function restGet()
 
                     $inc++;
                 }
+            } elseif ($GLOBALS['request'][1] == "users") {
+                /*
+                * READ USERS
+                */
+
+                // load library
+                include_once '../sources/SplClassLoader.php';
+                // about the user
+                $response = DB::query(
+                    "SELECT login
+                    FROM ".prefix_table("users")
+                );
+
+                $json = array();
+
+                foreach ($response as $data) {
+                    $login = $data['login'];
+                    array_push($json, $login);
+                }
             } elseif ($GLOBALS['request'][1] == "userfolders") {
                 /*
                 * READ USER FOLDERS
