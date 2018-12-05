@@ -48,7 +48,7 @@ $htmlHeaders = '
         <link rel="stylesheet" href="includes/js/select2/css/select2.min.css" type="text/css" />
         <script type="text/javascript" src="includes/js/select2/js/select2.full.min.js"></script>
         <script type="text/javascript" src="includes/js/platform/platform.js"></script>
-
+        <script type="text/javascript" src="includes/js/clipboard/clipboard.min.js"></script>
 
         <script type="text/javascript" src="includes/libraries/Authentication/agses/agses.jquery.js"></script>
         <link rel="stylesheet" href="includes/libraries/Authentication/agses/agses.css" type="text/css" />
@@ -69,7 +69,6 @@ if (isset($_GET['page']) && $_GET['page'] == "items") {
         <link rel="stylesheet" type="text/css" href="includes/js/multiselect/jquery.multiselect.filter.css" />
         <script type="text/javascript" src="includes/js/multiselect/jquery.multiselect.filter.js"></script>
         <script type="text/javascript" src="includes/js/tinysort/jquery.tinysort.min.js"></script>
-        <script type="text/javascript" src="includes/js/clipboard/clipboard.min.js"></script>
         <script type="text/javascript" src="includes/js/verimail/verimail.min.js"></script>
         <!--
         <link rel="stylesheet" href="includes/bootstrap/css/bootstrap.min.css" />
@@ -198,7 +197,11 @@ $htmlHeaders .= '
                 return false;
             }
         } else {
-
+            if ($("#ga_code").val() !== "" || $("#yubiko_key").val() !== "") {
+                user2FaMethod = true;
+            } else {
+                return false;
+            }
         }
         
         // launch identification
@@ -212,61 +215,59 @@ $htmlHeaders .= '
         var d = new Date();
         var TimezoneOffset = d.getTimezoneOffset()*60;
 
-        // get some info
-        var client_info = "";
-        $.getJSON("https://ipapi.co/json", function() {
-            // nothing to do
-        })
-        .always(function(answered_data) {
-            if (answered_data.ip !== "") {
-                client_info = answered_data.country+"-"+answered_data.city+"-"+answered_data.timezone;
-            }
+        // Get 2fa
+        $.post(
+            "sources/identify.php",
+            {
+                type : "get2FAMethods"
+            },
+            function(fa_methods) {
+                var data = {
+                    login               : $("#login").val(),
+                    pw                  : $("#pw").val(),
+                    duree_session       : $("#duree_session").val(),
+                    screenHeight        : $("body").innerHeight(),
+                    randomstring        : randomstring,
+                    TimezoneOffset      : TimezoneOffset,
+                    client              : "",
+                    user_2fa_selection  : user2FaMethod,
+                    login_sanitized     : sanitizeString($("#login").val()),
+                    pw_sanitized        : sanitizeString($("#pw").val()),
+                };
 
-            // Get 2fa
-            $.post(
-                "sources/identify.php",
-                {
-                    type : "get2FAMethods"
-                },
-                function(fa_methods) {
-                    var data = "";
-                    if (user2FaMethod === "" && fa_methods[0].nb === "1") {
-                        user2FaMethod = fa_methods[0].method;
-                    }
+                user2FaMethod = fa_methods[0].method;
+                data.user_2fa_selection = user2FaMethod;
 
-                    // Google 2FA
-                    if (user2FaMethod === "agses" && $("#agses_code").val() !== undefined) {
-                        data = \', "agses_code":"\' + $("#agses_code").val() + \'"\';
-                    }
-            
-                    // Google 2FA
-                    if (user2FaMethod === "google" && $("#ga_code").val() !== undefined) {
-                        data = \', "GACode":"\' + $("#ga_code").val() + \'"\';
-                    }
-                    
-                    // Yubico
-                    if (user2FaMethod === "yubico" && $("#yubiko_key").val() !== undefined) {
-                        data = \', "yubico_key":"\' + $("#yubiko_key").val()+ \'"\'+
-                            \', "yubico_user_id":"\' + ($("#yubico_user_id").val()) + \'"\'+
-                            \', "yubico_user_key":"\' + ($("#yubico_user_key").val()) + \'"\';
-                    }
-
-                    data = \'{"login":"\'+sanitizeString($("#login").val())+\'" , "pw":"\'+sanitizeString($("#pw").val())+\'" , "duree_session":"\'+$("#duree_session").val()+\'" , "screenHeight":"\'+$("body").innerHeight()+\'" , "randomstring":"\'+randomstring+\'" , "TimezoneOffset":"\'+TimezoneOffset+\'"\'+data+\' , "client":"\'+client_info+\'" , "user_2fa_selection":"\'+user2FaMethod+\'"}\';
-
+                // Google 2FA
+                if (user2FaMethod === "agses" && $("#agses_code").val() !== undefined) {
+                    data["agses_code"] = $("#agses_code").val();
+                }
+        
+                // Google 2FA
+                if (user2FaMethod === "google" && $("#ga_code").val() !== undefined) {
+                    data["GACode"] = $("#ga_code").val();
+                }
+                
+                // Yubico
+                if (user2FaMethod === "yubico" && $("#yubiko_key").val() !== undefined) {
+                    data["yubico_key"] = $("#yubiko_key").val();
+                    data["yubico_yubico_user_idkey"] = $("#yubico_user_id").val();
+                    data["yubico_user_key"] = $("#yubico_user_key").val();
+                }
+                
+                // Handle if DUOSecurity is enabled
+                if (user2FaMethod === "agses" && $("#agses_code").val() === "") {
+                    startAgsesAuth();
+                } else if (user2FaMethod !== "duo") {// || $("#login").val() === "admin"
+                    identifyUser(redirect, psk, data, randomstring);
+                } else {
                     // Handle if DUOSecurity is enabled
-                    if (user2FaMethod === "agses" && $("#agses_code").val() === "") {
-                        startAgsesAuth();
-                    } else if (user2FaMethod !== "duo" || $("#login").val() === "admin") {
-                        identifyUser(redirect, psk, data, randomstring);
-                    } else {
-                        // Handle if DUOSecurity is enabled
-                        $("#duo_data").val(window.btoa(data));
-                        loadDuoDialog();
-                    }
-                },
-                "json"
-            );
-        });
+                    $("#duo_data").val(window.btoa(data));
+                    loadDuoDialog();
+                }
+            },
+            "json"
+        );
     }
 
     //Identify user
@@ -285,7 +286,7 @@ $htmlHeaders .= '
                         "sources/identify.php",
                         {
                             type : "identify_user",
-                            data : prepareExchangedData(data, "encode", "'.$_SESSION["key"].'")
+                            data : prepareExchangedData(JSON.stringify(data), "encode", "'.$_SESSION["key"].'")
                         },
                         function(data) {
                             if (data[0].value === randomstring) {
@@ -476,31 +477,6 @@ $htmlHeaders .= '
         );
     }
 
-    /*
-    * Manage generation of new password
-    */
-    function GenerateNewPassword(key, login)
-    {
-        $("#ajax_loader_send_mail").show();
-        // prepare data
-        data = \'{"login":"\'+sanitizeString(login)+\'" ,\'+
-            \'"key":"\'+sanitizeString(key)+\'"}\';
-        //send query
-        $.post("sources/main.queries.php", {
-                type : "generate_new_password",
-                data : prepareExchangedData(data, "encode", "'.$_SESSION["key"].'")
-            },
-            function(data) {
-                if (data === "done") {
-                    setTimeout(function(){document.location.href="logout.php"}, 10);
-                } else {
-                    $("#generate_new_pw_error").show().html(data);
-                }
-                $("#ajax_loader_send_mail").hide();
-            }
-       );
-    }
-
 
     function loadProfileDialog()
     {
@@ -640,7 +616,11 @@ $htmlHeaders .= '
     {
         if ($("#new_pw").val() != "" && $("#new_pw").val() == $("#new_pw2").val()) {
             if (parseInt($("#pw_strength_value").val()) >= parseInt($("#user_pw_complexity").val())) {
-                var data = "{\"new_pw\":\""+sanitizeString($("#new_pw").val())+"\"}";
+                //var data = "{\"new_pw\":\""+sanitizeString($("#new_pw").val())+"\"}";
+                var data = {
+                    new_pw  : $("#new_pw").val(),
+                };
+
                 $.post(
                     "sources/main.queries.php",
                     {
@@ -648,7 +628,7 @@ $htmlHeaders .= '
                         change_pw_origine   : "first_change",
                         complexity          : $("#user_pw_complexity").val(),
                         key                 : "'.$_SESSION['key'].'",
-                        data                : prepareExchangedData(data, "encode", "'.$_SESSION['key'].'>")
+                        data                : prepareExchangedData(JSON.stringify(data), "encode", "'.$_SESSION['key'].'>")
                     },
                     function(data) {
                         if (data[0].error == "complexity_level_not_reached") {
@@ -1475,7 +1455,53 @@ $htmlHeaders .= '
         // Show Profile dialog is expected
         if ($("#force_show_dialog").val() === "1") {
             loadProfileDialog();
-        }
+        }';
+
+if (isset($_GET['login']) === true && isset($_GET['key']) === true) {
+    $htmlHeaders .= '
+        // Send query for password geenration
+        $("#but_generate_new_password").click(function() {
+            $("#ajax_loader_send_mail").show();
+            // prepare data
+            var login = sanitizeString("'.htmlspecialchars($_GET['login'], ENT_QUOTES).'");
+            var key = sanitizeString("'.htmlspecialchars($_GET['key'], ENT_QUOTES).'");
+
+            data = {"login":login , "key":key};
+            //send query
+            $.post("sources/main.queries.php", {
+                    type : "generate_new_password",
+                    data : prepareExchangedData(JSON.stringify(data), "encode", "'.$_SESSION["key"].'")
+                },
+                function(data) {
+                    if (data === "done") {
+                        setTimeout(function(){document.location.href="logout.php"}, 10);
+                    } else {
+                        $("#generate_new_pw_error").show().html(data);
+                    }
+                    $("#ajax_loader_send_mail").hide();
+                }
+            );
+        });
+        ';
+}
+
+$htmlHeaders .= '
+
+        var clipboardOTV = new ClipboardJS(".otv-link", {
+            container: document.getElementById("dialog_otv"),
+            text: function(trigger) {
+                return $("#otv-url").val();
+            }
+        });
+
+        clipboardOTV.on("success", function(e) {
+            $("#dialog_otv").dialog("close");
+            $("#message_box")
+                .html("'.addslashes($LANG['url_copied_clipboard']).'")
+                .show()
+                .fadeOut(1000);
+            e.clearSelection();
+        });
 
         setTimeout(function() { NProgress.done(); $(".fade").removeClass("out"); }, 1000);
     });';

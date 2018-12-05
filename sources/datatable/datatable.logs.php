@@ -11,7 +11,8 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  */
-require_once('../SecureHandler.php');
+
+require '../SecureHandler.php';
 session_start();
 if (!isset($_SESSION['CPM']) || $_SESSION['CPM'] != 1) {
     die('Hacking attempt...');
@@ -19,15 +20,27 @@ if (!isset($_SESSION['CPM']) || $_SESSION['CPM'] != 1) {
 
 // Load config
 if (file_exists('../../includes/config/tp.config.php')) {
-    require_once '../../includes/config/tp.config.php';
+    include_once '../../includes/config/tp.config.php';
 } else {
     throw new Exception("Error file '/includes/config/tp.config.php' not exists", 1);
+}
+
+/* do checks */
+require_once $SETTINGS['cpassman_dir'].'/sources/checks.php';
+if (checkUser($_SESSION['user_id'], $_SESSION['key'], "manage_users") === false) {
+    $_SESSION['error']['code'] = ERR_NOT_ALLOWED; //not allowed page
+    die('Hacking attempt...');
+}
+
+if (isset($_GET['token']) === false || $_GET['token'] !== $_SESSION["key"]) {
+    $_SESSION['error']['code'] = ERR_NOT_ALLOWED; //not allowed page
+    die('Hacking attempt...');
 }
 
 require_once $SETTINGS['cpassman_dir'].'/sources/SplClassLoader.php';
 
 global $k, $settings;
-include $SETTINGS['cpassman_dir'].'/includes/config/settings.php';
+require $SETTINGS['cpassman_dir'].'/includes/config/settings.php';
 require_once $SETTINGS['cpassman_dir'].'/sources/main.functions.php';
 header("Content-type: text/html; charset=utf-8");
 require_once $SETTINGS['cpassman_dir'].'/includes/language/'.$_SESSION['user_language'].'.php';
@@ -767,6 +780,119 @@ if (isset($_GET['action']) && $_GET['action'] == "connections") {
 
         //col3
         $sOutput .= '"'.htmlspecialchars(stripslashes($record['who']), ENT_QUOTES).'"';
+
+        //Finish the line
+        $sOutput .= '],';
+    }
+
+    if (count($rows) > 0) {
+        $sOutput = substr_replace($sOutput, "", -1);
+        $sOutput .= '] }';
+    } else {
+        $sOutput .= '[] }';
+    }
+} elseif (isset($_GET['action']) && $_GET['action'] == "users" && isset($_GET['userid'])) {
+    // user id
+    $getUserId = filter_var($_GET['userid'], FILTER_SANITIZE_NUMBER_INT);
+
+    //Columns name
+    $aColumns = array('l.date', 'i.label', 'l.action', 'i.perso');
+
+    //Ordering
+    if (isset($_GET['iSortCol_0']) && isset($_GET['sSortDir_0']) && in_array(strtoupper($_GET['sSortDir_0']), $aSortTypes)) {
+        $sOrder = "ORDER BY  ";
+        for ($i = 0; $i < intval($_GET['iSortingCols']); $i++) {
+            if ($_GET['bSortable_'.filter_var($_GET['iSortCol_'.$i], FILTER_SANITIZE_NUMBER_INT)] == "true" &&
+                preg_match("#^(asc|desc)\$#i", $_GET['sSortDir_'.$i])
+            ) {
+                $sOrder .= "".$aColumns[filter_var($_GET['iSortCol_'.$i], FILTER_SANITIZE_NUMBER_INT)]." "
+                .mysqli_escape_string($link, $_GET['sSortDir_'.$i]).", ";
+            }
+        }
+
+        $sOrder = substr_replace($sOrder, "", -2);
+        if ($sOrder == "ORDER BY") {
+            $sOrder = "";
+        }
+    }
+
+    // Filtering
+    $sWhere = " WHERE u.id = '".$getUserId."'";
+    if ($_GET['sSearch'] != "") {
+        $sWhere .= " AND (";
+        for ($i = 0; $i < count($aColumns); $i++) {
+            $sWhere .= $aColumns[$i]." LIKE %ss_".$i." OR ";
+        }
+        $sWhere = substr_replace($sWhere, "", -3).") ";
+    }
+    
+    DB::query(
+        "SELECT *
+        FROM ".$pre."log_items AS l
+        INNER JOIN ".$pre."items AS i ON (l.id_item=i.id)
+        INNER JOIN ".$pre."users AS u ON (l.id_user=u.id)
+        INNER JOIN ".$pre."nested_tree AS t ON (i.id_tree=t.id)".
+        $sWhere,
+        array(
+            '0' => filter_var($_GET['sSearch'], FILTER_SANITIZE_STRING),
+            '1' => filter_var($_GET['sSearch'], FILTER_SANITIZE_STRING),
+            '2' => filter_var($_GET['sSearch'], FILTER_SANITIZE_STRING),
+            '3' => filter_var($_GET['sSearch'], FILTER_SANITIZE_STRING)
+        )
+    );
+    $iTotal = DB::count();
+
+    $rows = DB::query(
+        "SELECT l.date AS date, u.login AS login, i.label AS label,
+            i.perso AS perso, l.action AS action, t.title AS folder
+            FROM ".$pre."log_items AS l
+            INNER JOIN ".$pre."items AS i ON (l.id_item=i.id)
+            INNER JOIN ".$pre."users AS u ON (l.id_user=u.id)
+            INNER JOIN ".$pre."nested_tree AS t ON (i.id_tree=t.id)
+        $sWhere
+        $sOrder
+        $sLimit",
+        array(
+            '0' => filter_var($_GET['sSearch'], FILTER_SANITIZE_STRING),
+            '1' => filter_var($_GET['sSearch'], FILTER_SANITIZE_STRING),
+            '2' => filter_var($_GET['sSearch'], FILTER_SANITIZE_STRING),
+            '3' => filter_var($_GET['sSearch'], FILTER_SANITIZE_STRING)
+        )
+    );
+    $iFilteredTotal = DB::count();
+
+    // Output
+    if ($iTotal == "") {
+        $iTotal = 0;
+    }
+    $sOutput = '{';
+    $sOutput .= '"sEcho": '.intval($_GET['sEcho']).', ';
+    $sOutput .= '"iTotalRecords": '.$iTotal.', ';
+    $sOutput .= '"iTotalDisplayRecords": '.$iTotal.', ';
+    $sOutput .= '"aaData": ';
+
+    if ($iFilteredTotal > 0) {
+        $sOutput .= '[';
+    }
+ 
+    foreach ($rows as $record) {
+        $sOutput .= "[";
+
+        //col1
+        $sOutput .= '"'.date($SETTINGS['date_format']." ".$SETTINGS['time_format'], $record['date']).'", ';
+
+        //col3
+        $sOutput .= '"'.(stripslashes("<b>".handleBackslash($record['label'])."</b>&nbsp;<span style='font-size:10px;font-style:italic;'><i class='fa fa-folder-o'></i>&nbsp;".$record['folder']."</span>")).'", ';
+
+        //col4
+        $sOutput .= '"'.htmlspecialchars(stripslashes($LANG[$record['action']]), ENT_QUOTES).'", ';
+
+        //col5
+        if ($record['perso'] == 1) {
+            $sOutput .= '"'.htmlspecialchars(stripslashes($LANG['yes']), ENT_QUOTES).'"';
+        } else {
+            $sOutput .= '"'.htmlspecialchars(stripslashes($LANG['no']), ENT_QUOTES).'"';
+        }
 
         //Finish the line
         $sOutput .= '],';

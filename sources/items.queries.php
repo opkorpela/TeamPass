@@ -571,7 +571,7 @@ if (null !== $post_type) {
                 $counter = DB::count();
                 $itemExists = 0;
                 $counter = DB::count();
-                if ($counter > 0) {
+                if ($counter > 1) {
                     $itemExists = 1;
                 } else {
                     $itemExists = 0;
@@ -2628,14 +2628,14 @@ if (null !== $post_type) {
                     $counter = count($_SESSION['list_folders_limited'][$post_id]);
                     $uniqueLoadData['counter'] = $counter;
                 // check if this folder is visible
-                } elseif (!in_array(
+                } elseif (in_array(
                     $post_id,
                     array_merge(
                         $_SESSION['groupes_visibles'],
                         @array_keys($_SESSION['list_restricted_folders_for_items']),
                         @array_keys($_SESSION['list_folders_limited'])
                     )
-                )) {
+                ) === false) {
                     echo prepareExchangedData(
                         array(
                             "error" => "not_authorized",
@@ -2732,12 +2732,11 @@ if (null !== $post_type) {
             }
 
             // build the HTML for this set of Items
-            if ($counter > 0 && empty($showError)) {
+            if ($counter > 0 && empty($showError) === true) {
                 // init variables
                 $init_personal_folder = false;
                 $expired_item = false;
                 $limited_to_items = "";
-
                 // List all ITEMS
                 if ($folderIsPf === false) {
                     $where->add('i.inactif=%i', 0);
@@ -2746,10 +2745,17 @@ if (null !== $post_type) {
                         $where->add('i.id IN %ls', explode(",", $limited_to_items));
                     }
 
-                    $query_limit = " LIMIT ".
-                        $start.",".
-                        $post_nb_items_to_display_once;
-
+                    // Prepare limit for query
+                    if (isset($SETTINGS['nb_items_by_query']) === true
+                        && $SETTINGS['nb_items_by_query'] !== 'max'
+                    ) {
+                        $query_limit = " LIMIT ".
+                            $start.",".
+                            $post_nb_items_to_display_once;
+                    } else {
+                        $query_limit = '';
+                    }
+                        
                     $rows = DB::query(
                         "SELECT i.id AS id, MIN(i.restricted_to) AS restricted_to, MIN(i.perso) AS perso,
                         MIN(i.label) AS label, MIN(i.description) AS description, MIN(i.pw) AS pw, MIN(i.login) AS login,
@@ -2765,7 +2771,7 @@ if (null !== $post_type) {
                         $where
                     );
                 } else {
-                    $post_nb_items_to_display_once = "max";
+                    $post_nb_items_to_display_once = -999;
                     $where->add('i.inactif=%i', 0);
 
                     $rows = DB::query(
@@ -3076,9 +3082,9 @@ if (null !== $post_type) {
                 $counter_full = DB::count();
                 $uniqueLoadData['counter_full'] = $counter_full;
             }
-
+            
             // Check list to be continued status
-            if ($post_nb_items_to_display_once !== 'max' && ($post_nb_items_to_display_once + $start) < $counter_full) {
+            if ((int) $post_nb_items_to_display_once !== -999 && ($post_nb_items_to_display_once + $start) < $counter_full) {
                 $listToBeContinued = "yes";
             } else {
                 $listToBeContinued = "end";
@@ -4020,12 +4026,8 @@ if (null !== $post_type) {
             echo json_encode(
                 array(
                     "error" => "",
-                    "url" => str_replace(
-                        array("#URL#", "#DAY#"),
-                        array('<span id="otv_link">'.$url.'</span>&nbsp;<i class="fa-stack tip clipboard-icon" title="'.addslashes($LANG['copy']).'" style="cursor:pointer;" id="'.$element_id.'" data-clipboard-text="'.$url.'"><span class="fa fa-square fa-stack-2x"></span><span class="fa fa-clipboard fa-stack-1x fa-inverse"></span></i>', $exp_date),
-                        $LANG['one_time_view_item_url_box']
-                    ),
-                    'element_id' => $element_id
+                    'url' => $url,
+                    'date' => $exp_date,
                 )
             );
             break;
