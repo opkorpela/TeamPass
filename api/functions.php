@@ -448,6 +448,139 @@ function restGet()
 
                     $inc++;
                 }
+            } elseif ($GLOBALS['request'][1] == "listfiles") {
+                /*
+                * LIST FILE ATTACHMENTS
+                *
+                * <url to teampass>/api/index.php/read/listfiles/<item_id>?apikey=<valid api key>
+                */
+
+                // load library
+                require_once '../sources/SplClassLoader.php';
+
+                // List a password item's file attachments
+                // only accepts a single numeric item id
+                $item = $GLOBALS['request'][2];
+
+                if (trim($item) == "") {
+                    restError('NO_ITEM');
+                }
+
+                if (!is_numeric($item)) {
+                    restError('ITEM_MALFORMED');
+                }
+
+                $response = DB::query("select id,name,size,extension,type,file from ".prefix_table("files")." where id_item = %d", $item);
+
+                foreach ($response as $data)
+                {
+                    // prepare output
+                    $id = $data['id'];
+                    $json[$id]['id'] = $data['id'];
+                    $json[$id]['name'] = utf8_encode($data['name']);
+                    $json[$id]['size'] = utf8_encode($data['size']);
+                    $json[$id]['extension'] = utf8_encode($data['extension']);
+                    $json[$id]['type'] = utf8_encode($data['type']);
+                }
+            } elseif ($GLOBALS['request'][1] == "files") {
+                /*
+                * READ FILE ATTACHMENTS
+                *
+                * <url to teampass>/api/index.php/read/files/<file_id>?apikey=<valid api key>
+                */
+
+                // load library
+                require_once '../sources/SplClassLoader.php';
+
+                // Returns a password item's attachment files
+                // only accepts a single numeric file id
+                $fileId = $GLOBALS['request'][2];
+
+                if (trim($fileId) == "") {
+                    restError('NO_FILE_ID');
+                }
+
+                if (!is_numeric($fileId)) {
+                    restError('FILE_MALFORMED');
+                }
+
+                $settings = array();
+                foreach (DB::query("select intitule, valeur from ".prefix_table("misc")) as $data) {
+                    $settings[$data['intitule']] = $data['valeur'];
+                }
+
+                $file_info = DB::queryfirstrow("select id,name,size,extension,type,file,status from ".prefix_table("files")." where id = %i", $fileId);
+
+                if (DB::count() == 0) {
+                    restError('EMPTY');
+                }
+
+                header('Content-disposition: attachment; filename='.rawurldecode(basename($file_info['name'])));
+                header('Content-Type: application/octet-stream');
+                header('Cache-Control: must-revalidate, no-cache, no-store');
+                header('Expires: 0');
+
+                // should we encrypt/decrypt the file
+                encrypt_or_decrypt_file($file_info['file'], $file_info['status']);
+
+                // should we decrypt the attachment?
+                if (isset($file_info['status']) && $file_info['status'] === "encrypted") {
+                    // load PhpEncryption library
+                    require_once $SETTINGS['cpassman_dir'].'/includes/libraries/Encryption/Encryption/'.'Crypto.php';
+                    require_once $SETTINGS['cpassman_dir'].'/includes/libraries/Encryption/Encryption/'.'Encoding.php';
+                    require_once $SETTINGS['cpassman_dir'].'/includes/libraries/Encryption/Encryption/'.'DerivedKeys.php';
+                    require_once $SETTINGS['cpassman_dir'].'/includes/libraries/Encryption/Encryption/'.'Key.php';
+                    require_once $SETTINGS['cpassman_dir'].'/includes/libraries/Encryption/Encryption/'.'KeyOrPassword.php';
+                    require_once $SETTINGS['cpassman_dir'].'/includes/libraries/Encryption/Encryption/'.'File.php';
+                    require_once $SETTINGS['cpassman_dir'].'/includes/libraries/Encryption/Encryption/'.'RuntimeTests.php';
+                    require_once $SETTINGS['cpassman_dir'].'/includes/libraries/Encryption/Encryption/'.'KeyProtectedByPassword.php';
+                    require_once $SETTINGS['cpassman_dir'].'/includes/libraries/Encryption/Encryption/'.'Core.php';
+
+                    // get KEY
+                    $ascii_key = file_get_contents(SECUREPATH."/teampass-seckey.txt");
+
+                    // Now encrypt the file with new saltkey
+                    $err = '';
+                    try {
+                        \Defuse\Crypto\File::decryptFile(
+                            $SETTINGS['path_to_upload_folder'].'/'.$file_info['file'],
+                            $SETTINGS['path_to_upload_folder'].'/'.$file_info['file'].".delete",
+                            \Defuse\Crypto\Key::loadFromAsciiSafeString($ascii_key)
+                        );
+                    } catch (Defuse\Crypto\Exception\WrongKeyOrModifiedCiphertextException $ex) {
+                        $err = "An attack! Either the wrong key was loaded, or the ciphertext has changed since it was created either corrupted in the database or intentionally modified by someone trying to carry out an attack.";
+                    } catch (Defuse\Crypto\Exception\BadFormatException $ex) {
+                        $err = $ex;
+                    } catch (Defuse\Crypto\Exception\EnvironmentIsBrokenException $ex) {
+                        $err = $ex;
+                    } catch (Defuse\Crypto\Exception\CryptoException $ex) {
+                        $err = $ex;
+                    } catch (Defuse\Crypto\Exception\IOException $ex) {
+                        $err = $ex;
+                    }
+                    if (empty($err) === false) {
+                        echo $err;
+                    }
+
+                    $filepointer = fopen($SETTINGS['path_to_upload_folder'].'/'.$file_info['file'].".delete", 'rb');
+
+                    // Read the file contents
+                    fpassthru($filepointer);
+
+                    // Close the file
+                    fclose($filepointer);
+
+                    unlink($SETTINGS['path_to_upload_folder'].'/'.$file_info['file'].".delete");
+                } else {
+                    $filepointer = fopen($SETTINGS['path_to_upload_folder'].'/'.$file_info['file'], 'rb');
+
+                    // Read the file contents
+                    fpassthru($filepointer);
+
+                    // Close the file
+                    fclose($filepointer);
+                }
+                exit(0);
             } elseif ($GLOBALS['request'][1] == "userpw") {
                 /*
                 * READ USER ITEMS
@@ -548,15 +681,17 @@ function restGet()
                 include_once '../sources/SplClassLoader.php';
                 // about the user
                 $response = DB::query(
-                    "SELECT login
+                    "SELECT id,login
                     FROM ".prefix_table("users")
                 );
 
                 $json = array();
 
                 foreach ($response as $data) {
-                    $login = $data['login'];
-                    array_push($json, $login);
+                    $x = array();
+                    $x['id'] = $data['id'];
+                    $x['login'] = $data['login'];
+                    $json[] = $x;
                 }
             } elseif ($GLOBALS['request'][1] == "userfolders") {
                 /*
@@ -849,7 +984,7 @@ function restGet()
                     // do some checks
                     if (!empty($item_label) && !empty($item_pwd) && !empty($item_folder_id)) {
                         // Check length
-                        if (strlen($item_pwd) > 50) {
+                        if (strlen($item_pwd) > 90) {
                             restError('PASSWORDTOOLONG');
                         }
 
@@ -2785,6 +2920,230 @@ function restPut()
 }
 
 /**
+ * Undocumented function
+ *
+ * @return void
+ */
+function restPost()
+{
+    global $api_version;
+    global $SETTINGS;
+    global $link;
+
+    if (!@count($GLOBALS['request']) == 0) {
+        $request_uri = $GLOBALS['_SERVER']['REQUEST_URI'];
+        preg_match('/\/api(\/index.php|)\/(.*)\?apikey=(.*)/', $request_uri, $matches);
+        if (count($matches) == 0) {
+            restError('REQUEST_SENT_NOT_UNDERSTANDABLE');
+        }
+        $GLOBALS['request'] = explode('/', $matches[2]);
+    }
+
+    if (apikeyChecker($GLOBALS['apikey'])) {
+        teampassConnect();
+
+        // Load config
+        if (file_exists('../includes/config/tp.config.php')) {
+            require_once '../includes/config/tp.config.php';
+        } else {
+            throw new Exception("Error file '/includes/config/tp.config.php' not exists", 1);
+        }
+
+        if ($GLOBALS['request'][0] == "add") {
+            if ($GLOBALS['request'][1] == "file") {
+                /*
+                * ADDING A FILE
+                * POST to url <url to teampass>/api/index.php/add/file?apikey=<VALID API KEY>
+                * Content-Type multipart/form-data according to RFC 2388
+                * Data fields:
+                * - item_id: The item id to which the file will be attached
+                * - file: The file data. Use parameter 'filename' to set the file name for the attachment
+                * Example: curl "http://127.0.0.1/api/index.php/add/file?apikey=<VALID API KEY> -F "file=@Test.txt;filename=Test.txt" -F "item_id=1"
+                */
+
+                // HTTP headers for no cache etc
+                header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
+                header("Last-Modified: ".gmdate("D, d M Y H:i:s")." GMT");
+                header("Cache-Control: no-store, no-cache, must-revalidate");
+                header("Cache-Control: post-check=0, pre-check=0", false);
+                header("Content-Type: application/json");
+
+                // Look for the content type header
+                if (isset($_SERVER["HTTP_CONTENT_TYPE"])) {
+                    $contentType = $_SERVER["HTTP_CONTENT_TYPE"];
+                }
+
+                if (isset($_SERVER["CONTENT_TYPE"])) {
+                    $contentType = $_SERVER["CONTENT_TYPE"];
+                }
+
+                if (strpos($contentType, "multipart/form-data") !== 0) {
+                    restError('CONTENT_NOT_MULTIPART');
+                }
+
+                $targetDir = $SETTINGS['path_to_upload_folder'];
+                $valid_chars_regex = 'A-Za-z0-9'; //accept only those characters
+                $MAX_FILENAME_LENGTH = 260;
+
+                // Check post_max_size
+                $POST_MAX_SIZE = ini_get('post_max_size');
+                $unit = strtoupper(substr($POST_MAX_SIZE, -1));
+                $multiplier = ($unit == 'M' ? 1048576 : ($unit == 'K' ? 1024 : ($unit == 'G' ? 1073741824 : 1)));
+                if ((int) $_SERVER['CONTENT_LENGTH'] > $multiplier * (int) $POST_MAX_SIZE && $POST_MAX_SIZE) {
+                    restError('EXCEEDS_MAXIMUM_SIZE');
+                }
+
+                // Validate file name (for our purposes we'll just remove invalid characters)
+                $fileName = preg_replace('[^'.$valid_chars_regex.']', '', strtolower(basename($_FILES['file']['name'])));
+                if (strlen($fileName) == 0 || strlen($fileName) > $MAX_FILENAME_LENGTH) {
+                    restError('INVALID_FILE_NAME');
+                }
+
+                // Validate file extension
+                $ext = strtolower(getFileExtension($_FILES['file']['name']));
+                if (!in_array(
+                    $ext,
+                    explode(
+                        ',',
+                        $SETTINGS['upload_docext'].','.$SETTINGS['upload_imagesext'].
+                        ','.$SETTINGS['upload_pkgext'].','.$SETTINGS['upload_otherext']
+                    )
+                )) {
+                    restError('INVALID_FILE_EXTENSION');
+                }
+
+                // 5 minutes execution time
+                set_time_limit(5 * 60);
+
+                // Clean the fileName for security reasons
+                $fileName = preg_replace('/[^\w\._]+/', '_', $fileName);
+                $fileName = preg_replace('[^'.$valid_chars_regex.']', '', strtolower(basename($fileName)));
+
+                // Make sure the fileName is unique
+                if (file_exists($targetDir.DIRECTORY_SEPARATOR.$fileName)) {
+                    $ext = strrpos($fileName, '.');
+                    $fileNameA = substr($fileName, 0, $ext);
+                    $fileNameB = substr($fileName, $ext);
+
+                    $count = 1;
+                    while (file_exists($targetDir.DIRECTORY_SEPARATOR.$fileNameA.'_'.$count.$fileNameB)) {
+                        $count++;
+                    }
+
+                    $fileName = $fileNameA.'_'.$count.$fileNameB;
+                }
+
+                $post_itemId = $_POST['item_id'];
+
+                if (!ctype_digit($post_itemId)) {
+                    restError('ITEM_MALFORMED');
+                }
+
+                DB::queryFirstRow(
+                            "SELECT id
+                            FROM ".prefix_table("items")."
+                            WHERE id = %i",
+                            $post_itemId
+                );
+                if (DB::count() < 1) {
+                    restError('ITEM_NOT_FOUND');
+                }
+
+                $filePath = $targetDir.DIRECTORY_SEPARATOR.$fileName;
+
+                // Create target dir
+                if (!file_exists($targetDir)) {
+                    try {
+                        mkdir($targetDir, 0777, true);
+                    } catch (Exception $e) {
+                        print_r($e);
+                    }
+                }
+
+                if (isset($_FILES['file']['tmp_name']) && is_uploaded_file($_FILES['file']['tmp_name'])) {
+                    // Open temp file
+                    $outfile = fopen($filePath, "wb");
+
+                    if ($outfile) {
+                        // Read binary input stream and append it to temp file
+                        $infile = fopen($_FILES['file']['tmp_name'], "rb");
+
+                        if ($infile) {
+                            while ($buff = fread($infile, 4096)) {
+                                fwrite($outfile, $buff);
+                            }
+                        } else {
+                            restError('INPUT_STREAM_ERROR');
+                        }
+                        fclose($infile);
+                        fclose($outfile);
+
+                        fileDelete($_FILES['file']['tmp_name']);
+                    } else {
+                        restError('OUTPUT_STREAM_ERROR');
+                    }
+                } else {
+                    restError('FILE_MOVE_ERROR');
+                }
+
+                // Get some variables
+                $fileRandomId = md5($fileName.time());
+                rename($filePath, $targetDir.DIRECTORY_SEPARATOR.$fileRandomId);
+
+                // Encrypt the file if requested
+                if (isset($SETTINGS['enable_attachment_encryption']) && $SETTINGS['enable_attachment_encryption'] === '1') {
+                    // Do encryption
+                    prepareFileWithDefuse(
+                        'encrypt',
+                        $targetDir.DIRECTORY_SEPARATOR.$fileRandomId,
+                        $targetDir.DIRECTORY_SEPARATOR.$fileRandomId."_encrypted"
+                    );
+
+                    // Do cleanup of files
+                    unlink($targetDir.DIRECTORY_SEPARATOR.$fileRandomId);
+                    rename(
+                        $targetDir.DIRECTORY_SEPARATOR.$fileRandomId."_encrypted",
+                        $targetDir.DIRECTORY_SEPARATOR.$fileRandomId
+                    );
+
+                    $file_status = "encrypted";
+                } else {
+                    $file_status = "clear";
+                }
+
+                // Store to database
+                DB::insert(
+                    prefix_table('files'),
+                    array(
+                        'id_item' => $post_itemId,
+                        'name' => $fileName,
+                        'size' => $_FILES['file']['size'],
+                        'extension' => $ext,
+                        'type' => $_FILES['file']['type'],
+                        'file' => $fileRandomId,
+                        'status' => $file_status
+                    )
+                );
+
+                // Log upload into databse
+                DB::insert(
+                    prefix_table('log_items'),
+                    array(
+                        'id_item' => $post_itemId,
+                        'date' => time(),
+                        'id_user' => -1,
+                        'action' => 'api at_modification',
+                        'raison' => 'api at_add_file : '.addslashes($fileName)
+                    )
+                );
+
+                echo '{"status": "success"}';
+            }
+        }
+    }
+}
+
+/**
  * Return correct error message
  *
  * @param  string $type
@@ -2909,6 +3268,50 @@ function restError($type, $detail = 'N/A')
             break;
         case 'EXPECTED_PARAMETER_NOT_PROVIDED':
             $message = array('err' => 'Provided parameters are not correct');
+            break;
+        case 'NO_FILE_NAME':
+            http_response_code(400);
+            $message = array('err' => 'No file name provided');
+            break;
+        case 'NO_FILE_ID':
+            http_response_code(400);
+            $message = array('err' => 'No file id provided');
+            break;
+        case 'FILE_MALFORMED':
+            http_response_code(400);
+            $message = array('err' => 'File definition not numeric');
+            break;
+        case 'ITEM_NOT_FOUND':
+            http_response_code(400);
+            $message = array('err' => 'Item not found');
+            break;
+        case 'CONTENT_NOT_MULTIPART':
+            http_response_code(400);
+            $message = array('err' => 'Content-type must be multipart/form-data');
+            break;
+        case 'EXCEEDS_MAXIMUM_SIZE':
+            http_response_code(413);
+            $message = array('err' => 'POST exceeded maximum allowed size');
+            break;
+        case 'INVALID_FILE_NAME':
+            http_response_code(400);
+            $message = array('err' => 'Invalid file name');
+            break;
+        case 'INVALID_FILE_EXTENSION':
+            http_response_code(400);
+            $message = array('err' => 'Invalid file extension');
+            break;
+        case 'INPUT_STREAM_ERROR':
+            http_response_code(500);
+            $message = array('err' => 'Failed to open input stream');
+            break;
+        case 'OUTPUT_STREAM_ERROR':
+            http_response_code(500);
+            $message = array('err' => 'Failed to open output stream');
+            break;
+        case 'FILE_MOVE_ERROR':
+            http_response_code(500);
+            $message = array('err' => 'Failed to move uploaded file');
             break;
         default:
             $message = array('err' => 'Something happen ... but what ?');
