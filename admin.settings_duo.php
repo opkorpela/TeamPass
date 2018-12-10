@@ -127,6 +127,27 @@ td {
 echo '
 <div id="tabs-9">
   <table><tbody>
+
+  <!-- Admin also impacted -->
+    <tr class="googleauth">
+      <td>
+        <label>
+          <i class="fa fa-chevron-right mi-grey-1"></i>
+          '.$LANG['2factors_expected_for_admin'].'
+          <i class="fa fa-question-circle tip" title="'.htmlentities(strip_tags($LANG['2factors_expected_for_admin_tip']), ENT_QUOTES).'"></i>
+        </label>
+      </td>
+      <td>
+        <div class="toggle toggle-modern" id="admin_2fa_required" data-toggle-on="', isset($SETTINGS['admin_2fa_required']) && $SETTINGS['admin_2fa_required'] == 1 ? 'true' : 'false', '">
+        </div>
+        <input type="hidden" id="admin_2fa_required_input" name="admin_2fa_required_input" value="', isset($SETTINGS['admin_2fa_required']) && $SETTINGS['admin_2fa_required'] == 1 ? '1' : '0', '" />
+      </td>
+    </tr>
+
+  <tr>
+    <td colspan="2"><hr />
+    </td>
+  </tr>
 <!-- Google Authentication toggle -->
     <tr class="googleauth">
       <td>
@@ -409,7 +430,7 @@ function SaveKeys()
     $("#save_wait").show();
 
     var data = "{\"akey\":\""+sanitizeString($("#duo_akey").val())+"\", \"ikey\":\""+sanitizeString($("#duo_ikey").val())+"\", \"skey\":\""+sanitizeString($("#duo_skey").val())+"\", \"host\":\""+sanitizeString($("#duo_host").val())+"\"}";
-    console.log(data);
+
     $.post(
         "sources/admin.queries.php",
         {
@@ -555,7 +576,6 @@ $(function() {
 
                     return;
                 }
-                console.log(data);
                 if (data.error == "") {
                     $("#"+e.target.id).before("<i class=\"fa fa-check fa-lg mi-green new_check\" style=\"float:right;\"></i>");
                     $(".new_check").fadeOut(2000);

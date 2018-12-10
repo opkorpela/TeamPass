@@ -318,6 +318,16 @@ while ($row = mysqli_fetch_assoc($result)) {
 mysqli_free_result($result);
 
 
+// alter table Users
+mysqli_query($db_link, "ALTER TABLE `".$pre."users` MODIFY groupes_visibles varchar(1000) NOT NULL");
+mysqli_query($db_link, "ALTER TABLE `".$pre."users` MODIFY fonction_id varchar(1000) NOT NULL");
+mysqli_query($db_link, "ALTER TABLE `".$pre."users` MODIFY groupes_interdits varchar(1000) NOT NULL");
+mysqli_query($db_link, "ALTER TABLE `".$pre."users` MODIFY favourites varchar(1000) NOT NULL");
+mysqli_query($db_link, "ALTER TABLE `".$pre."users` MODIFY latest_items varchar(1000) NOT NULL");
+mysqli_query($db_link, "ALTER TABLE `".$pre."users` MODIFY avatar varchar(1000) NOT NULL");
+mysqli_query($db_link, "ALTER TABLE `".$pre."users` MODIFY avatar_thumb varchar(1000) NOT NULL");
+
+
 // alter table KB_ITEMS
 mysqli_query($db_link, "ALTER TABLE `".$pre."kb_items` CHANGE `kb_id` `kb_id` INT(12) NOT NULL");
 mysqli_query($db_link, "ALTER TABLE `".$pre."kb_items` CHANGE `item_id` `item_id` INT(12) NOT NULL");
@@ -419,6 +429,22 @@ $res = addColumnIfNotExist(
 );
 if ($res === false) {
     echo '[{"finish":"1", "msg":"", "error":"An error appears when adding field timestamp to table CACHE! '.mysqli_error($db_link).'!"}]';
+    mysqli_close($db_link);
+    exit();
+}
+
+
+// alter table NESTED_TREE
+$res = addColumnIfNotExist(
+    $pre."users",
+    "user_ip_lastdate",
+    "VARCHAR(50) NULL DEFAULT NULL"
+);
+if ($res === true) {
+    // Change name of field
+    mysqli_query($db_link, "ALTER TABLE `".$pre."users` ADD `user_ip_lastdate` VARCHAR(50) NULL DEFAULT NULL AFTER `user_ip`");
+} elseif ($res === false) {
+    echo '[{"finish":"1", "msg":"", "error":"An error appears when adding user_ip_lastdate to table users! '.mysqli_error($db_link).'!"}]';
     mysqli_close($db_link);
     exit();
 }
@@ -783,6 +809,15 @@ if (intval($tmp) === 0) {
     );
 }
 
+// add new admin setting "admin_2fa_required"
+$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `".$pre."misc` WHERE type = 'admin' AND intitule = 'admin_2fa_required'"));
+if (intval($tmp) === 0) {
+    mysqli_query(
+        $db_link,
+        "INSERT INTO `".$pre."misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'admin_2fa_required', '1')"
+    );
+}
+
 
 // add new language "portuges_br"
 $tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `".$pre."languages` WHERE name = 'portuguese_br'"));
@@ -1026,6 +1061,19 @@ mysqli_query(
 );
 
 
+// alter table USERS
+mysqli_query(
+    $db_link,
+    "ALTER TABLE `".$pre."users` CHANGE `avatar` `avatar` VARCHAR(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL, CHANGE `avatar_thumb` `avatar_thumb` VARCHAR(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL;"
+);
+
+
+// alter table NESTED_TREE
+mysqli_query(
+    $db_link,
+    "ALTER TABLE `".$pre."nested_tree` CHANGE `nleft` `nleft` INT(11) NULL DEFAULT NULL, CHANGE `nright` `nright` INT(11) NULL DEFAULT NULL, CHANGE `nlevel` `nlevel` INT(11) NULL DEFAULT NULL;"
+);
+
 
 // add new field for items_change
 mysqli_query(
@@ -1193,7 +1241,7 @@ while ($row_field = mysqli_fetch_assoc($result)) {
 */
 $tp_config_file = "../includes/config/tp.config.php";
 if (file_exists($tp_config_file)) {
-    if (!copy($tp_config_file, $tp_config_file.'.'.date("Y_m_d", mktime(0, 0, 0, (int) date('m'), (int) date('d'), (int) date('y'))))) {
+    if (!copy($tp_config_file, $tp_config_file.'.'.date("Y_m_d", mktime(0, 0, 0, (int) date('m'), (int) date('d'), (int) date('y'))).'.'.time())) {
         echo '[{"error" : "includes/config/tp.config.php file already exists and cannot be renamed. Please do it by yourself and click on button Launch.", "result":"", "index" : "'.$post_index.'", "multiple" : "'.$post_multiple.'"}]';
         return false;
     } else {

@@ -3,7 +3,7 @@
  *
  * @package       (api)functions.php
  * @author        Nils Laumaillé <nils@teampass.net>
- * @version       2.1.3
+ * @version       2.1.5
  * @copyright     2009-2018 Nils Laumaillé
  * @license       GNU GPL-3.0
  * @link          https://www.teampass.net
@@ -13,7 +13,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-$api_version = "2.1.3";
+$api_version = "2.1.5";
 $_SESSION['CPM'] = 1;
 require_once "../includes/config/include.php";
 require_once "../sources/main.functions.php";
@@ -78,8 +78,8 @@ function teampassWhitelist()
 function teampassConnect()
 {
     global $server, $user, $pass, $database, $link, $port, $encoding;
-    require_once("../includes/config/settings.php");
-    require_once('../includes/libraries/Database/Meekrodb/db.class.php');
+    include_once "../includes/config/settings.php";
+    include_once '../includes/libraries/Database/Meekrodb/db.class.php';
     $pass = defuse_return_decrypted($pass);
     DB::$host = $server;
     DB::$user = $user;
@@ -117,10 +117,12 @@ function teampassGetIps()
 function teampassGetKeys()
 {
     teampassConnect();
-    $response = array_unique(array_merge(
-        DB::queryOneColumn("value", "select * from ".prefix_table("api")." WHERE type = %s", "key"),
-        DB::queryOneColumn("user_api_key", "select * from ".prefix_table("users")."")
-    ));
+    $response = array_unique(
+        array_merge(
+            DB::queryOneColumn("value", "select * from ".prefix_table("api")." WHERE type = %s", "key"),
+            DB::queryOneColumn("user_api_key", "select * from ".prefix_table("users")."")
+        )
+    );
 
     // remove none value
     if (($key = array_search('none', $response)) !== false) {
@@ -238,8 +240,11 @@ function urlSafeB64Decode($string)
 function restDelete()
 {
     if (!@count($GLOBALS['request']) == 0) {
-        $request_uri = $GLOBALS['_SERVER']['REQUEST_URI'];
-        preg_match('/\/api(\/index.php|)\/(.*)\?apikey=(.*)/', $request_uri, $matches);
+        preg_match(
+            '/\/api(\/index.php|)\/(.*)\?apikey=(.*)/',
+            $GLOBALS['_SERVER']['REQUEST_URI'],
+            $matches
+        );
         if (count($matches) == 0) {
             restError('REQUEST_SENT_NOT_UNDERSTANDABLE');
         }
@@ -361,16 +366,35 @@ function restGet()
     global $link;
 
     if (!@count($GLOBALS['request']) == 0) {
-        $request_uri = $GLOBALS['_SERVER']['REQUEST_URI'];
-        preg_match('/\/api(\/index.php|)\/(.*)\?apikey=(.*)/', $request_uri, $matches);
-        if (count($matches) == 0) {
-            restError('REQUEST_SENT_NOT_UNDERSTANDABLE');
+        // Manage type of request
+        switch ($_SERVER['REQUEST_METHOD']) {
+            case 'GET':
+                preg_match(
+                    '/\/api(\/index.php|)\/(.*)\?apikey=(.*)/',
+                    $GLOBALS['_SERVER']['REQUEST_URI'],
+                    $matches
+                );
+                if (count($matches) === 0) {
+                    restError('REQUEST_SENT_NOT_UNDERSTANDABLE');
+                }
+                $GLOBALS['request'] = explode('/', $matches[2]);
+                break;
+            case 'POST':
+                $body = file_get_contents("php://input");
+                if (strlen($body) === 0) {
+                    restError('EMPTY');
+                } else {
+                    $GLOBALS['request'] = explode('/', $body);
+                }
+                break;
+            default:
+                restError('EMPTY');
+                break;
         }
-        $GLOBALS['request'] = explode('/', $matches[2]);
     }
 
     if (apikeyChecker($GLOBALS['apikey'])) {
-
+        // Connect to Teampass
         teampassConnect();
 
         // define the API user through the LABEL of apikey
@@ -401,13 +425,55 @@ function restGet()
                 $tree->register();
                 $tree = new Tree\NestedTree\NestedTree(prefix_table("nested_tree"), 'id', 'parent_id', 'title');
 
-                // get ids
-                if (strpos($GLOBALS['request'][2], ";") > 0) {
-                    $condition = "id_tree IN %ls";
-                    $condition_value = explode(';', $GLOBALS['request'][2]);
+                // Now get user's rights based upon the API key
+                // If API key corresponds to a User then restrict items to what the user is allowed to
+                // If API key corresponds to a master key then show all
+                $response = DB::query(
+                    "SELECT fonction_id
+                    FROM ".prefix_table("users")."
+                    WHERE user_api_key = %s",
+                    $GLOBALS['apikey']
+                );
+                if (count($response) !== 0) {
+                    // User API key so limit what to show
+                    foreach ($response as $data) {
+                        $role_str = $data['fonction_id'];
+                    }
+                    $folder_arr = array();
+                    $roles = explode(";", $role_str);
+                    foreach ($roles as $role) {
+                        $response = DB::query(
+                            "SELECT folder_id
+                            FROM ".prefix_table("roles_values")."
+                            WHERE role_id = %i",
+                            $role
+                        );
+                        foreach ($response as $data) {
+                            $folder_id = $data['folder_id'];
+                            if (!array_key_exists($folder_id, $folder_arr)) {
+                                array_push($folder_arr, $folder_id);
+                            }
+                        }
+                    }
+                    $folder_str = array_filter($folder_arr);
+    
+                    // get ids
+                    if (is_array($folder_str)) {
+                        $condition = "id_tree IN %ls";
+                        $condition_value = $folder_str;
+                    } else {
+                        $condition = "id_tree = %s";
+                        $condition_value = $folder_str;
+                    }
                 } else {
-                    $condition = "id_tree = %s";
-                    $condition_value = $GLOBALS['request'][2];
+                    // Not a User KEY so show all
+                    if (strpos($GLOBALS['request'][2], ";") > 0) {
+                        $condition = "id_tree IN %ls";
+                        $condition_value = explode(';', $GLOBALS['request'][2]);
+                    } else {
+                        $condition = "id_tree = %s";
+                        $condition_value = $GLOBALS['request'][2];
+                    }
                 }
 
                 // get items in this folder
@@ -2465,7 +2531,7 @@ function restGet()
                 $user_pwd = urlSafeB64Decode($GLOBALS['request'][2]);
                 $user_saltkey = urlSafeB64Decode($GLOBALS['request'][3]);
 
-                $json = [];
+                $json = array();
                 $inc = 0;
                 if (strcmp($user_login, "admin") == 0) {
                     // forbid admin access
@@ -3032,6 +3098,7 @@ function restGet()
                 $json['status'] = 'OK';
             } elseif ($GLOBALS['request'][1] == "item") {
                 $array_items = explode(';', $GLOBALS['request'][2]);
+                $user_id = API_USER_ID;
 
                 // get user info
                 if (isset($GLOBALS['request'][3]) && !empty($GLOBALS['request'][3])) {
@@ -3039,9 +3106,7 @@ function restGet()
                         "SELECT `id` FROM ".$pre."users WHERE login = %s",
                         $GLOBALS['request'][3]
                     );
-                    if (DB::count() == 0) {
-                        $user_id = API_USER_ID;
-                    } else {
+                    if (DB::count() > 0) {
                         $user_id = $userData['id'];
                     }
                 }
@@ -3195,8 +3260,11 @@ function restGet()
 function restPut()
 {
     if (!@count($GLOBALS['request']) == 0) {
-        $request_uri = $GLOBALS['_SERVER']['REQUEST_URI'];
-        preg_match('/\/api(\/index.php|)\/(.*)\?apikey=(.*)/', $request_uri, $matches);
+        preg_match(
+            '/\/api(\/index.php|)\/(.*)\?apikey=(.*)/',
+            $GLOBALS['_SERVER']['REQUEST_URI'],
+            $matches
+        );
         if (count($matches) == 0) {
             restError('REQUEST_SENT_NOT_UNDERSTANDABLE');
         }

@@ -93,14 +93,18 @@ if (null !== filter_input(INPUT_POST, 'type', FILTER_SANITIZE_STRING)) {
             );
 
             // Prepare variables
-            $login = filter_var(htmlspecialchars_decode($dataReceived['login']), FILTER_SANITIZE_STRING);
-            $email = filter_var(htmlspecialchars_decode($dataReceived['email']), FILTER_SANITIZE_STRING);
-            $lastname = filter_var(htmlspecialchars_decode($dataReceived['lastname']), FILTER_SANITIZE_STRING);
-            $name = filter_var(htmlspecialchars_decode($dataReceived['name']), FILTER_SANITIZE_STRING);
-            $pw = filter_var(htmlspecialchars_decode($dataReceived['pw']), FILTER_SANITIZE_STRING);
+            $login = filter_var(($dataReceived['login']), FILTER_SANITIZE_STRING);
+            $email = filter_var(($dataReceived['email']), FILTER_SANITIZE_STRING);
+            $lastname = filter_var(($dataReceived['lastname']), FILTER_SANITIZE_STRING);
+            $name = filter_var(($dataReceived['name']), FILTER_SANITIZE_STRING);
+            if (array_key_exists('pw', $dataReceived)) {
+                $pw = filter_var(($dataReceived['pw']), FILTER_SANITIZE_STRING);
+            } else {
+                $pw = '';
+            }
 
             // Empty user
-            if (mysqli_escape_string($link, htmlspecialchars_decode($login)) == "") {
+            if (mysqli_escape_string($link, ($login)) == "") {
                 echo '[ { "error" : "'.addslashes($LANG['error_empty_data']).'" } ]';
                 break;
             }
@@ -219,13 +223,17 @@ if (null !== filter_input(INPUT_POST, 'type', FILTER_SANITIZE_STRING)) {
                 );
 
                 // get links url
-                if (empty($SETTINGS['email_server_url'])) {
+                if (empty($SETTINGS['email_server_url']) === true) {
                     $SETTINGS['email_server_url'] = $SETTINGS['cpassman_url'];
                 }
                 // Send email to new user
                 sendEmail(
                     $LANG['email_subject_new_user'],
-                    str_replace(array('#tp_login#', '#tp_pw#', '#tp_link#'), array(" ".addslashes($login), addslashes($pw), $SETTINGS['email_server_url']), $LANG['email_new_user_mail']),
+                    str_replace(
+                        array('#tp_login#', '#tp_pw#', '#tp_link#'),
+                        array(" ".addslashes($login), addslashes($pw), $SETTINGS['email_server_url']),
+                        $LANG['email_new_user_mail']
+                    ),
                     $dataReceived['email'],
                     $LANG,
                     $SETTINGS
@@ -982,7 +990,7 @@ if (null !== filter_input(INPUT_POST, 'type', FILTER_SANITIZE_STRING)) {
                 foreach ($rows as $record) {
                     if ($_SESSION['is_admin'] === '1'
                         || (($_SESSION['user_manager'] === '1' || $_SESSION['user_can_manage_all_users'] === "1")
-                        && (in_array($record['id'], $my_functions) || $record['creator_id'] == $_SESSION['user_id']))
+                        && (in_array($record['id'], $my_functions) || in_array($record['id'], $users_functions) || $record['creator_id'] == $_SESSION['user_id']))
                     ) {
                         if (in_array($record['id'], $users_functions)) {
                             $tmp = ' selected="selected"';
@@ -1540,8 +1548,8 @@ if (null !== filter_input(INPUT_POST, 'type', FILTER_SANITIZE_STRING)) {
             }
 
             foreach ($rows as $record) {
-                $list_users_from .= '<option id="share_from-'.$record['id'].'">'.$record['name'].' '.$record['lastname'].' ['.$record['login'].']</option>';
-                $list_users_to .= '<option id="share_to-'.$record['id'].'">'.$record['name'].' '.$record['lastname'].' ['.$record['login'].']</option>';
+                $list_users_from .= '<option id="share_from-'.$record['id'].'" data-id="'.$record['id'].'">'.$record['name'].' '.$record['lastname'].' ['.$record['login'].']</option>';
+                $list_users_to .= '<option id="share_to-'.$record['id'].'" data-id="'.$record['id'].'">'.$record['name'].' '.$record['lastname'].' ['.$record['login'].']</option>';
             }
 
             $return_values = prepareExchangedData(

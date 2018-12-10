@@ -91,11 +91,10 @@ $csrfp_config = include $SETTINGS['cpassman_dir'].'/includes/libraries/csrfp/lib
     //FUNCTION mask/unmask passwords characters
     function ShowPassword(pw)
     {
-        console.log("ici");
         if ($("#selected_items").val() == "") return;
 
         if ($('#id_pw').html().indexOf("fa-asterisk") != -1) {
-            mini(
+            itemLog(
                 "at_password_shown",
                 $('#id_item').val(),
                 $('#hid_label').val()
@@ -229,7 +228,7 @@ function ListerItems(groupe_id, restricted, start, stop_listing_current_folder)
                 start       : start,
                 uniqueLoadData : $("#uniqueLoadData").val(),
                 key         : "<?php echo $_SESSION['key']; ?>",
-                nb_items_to_display_once : $("#nb_items_to_display_once").val()
+                nb_items_to_display_once : $("#nb_items_to_display_once").val() === 'max' ? -999 : $("#nb_items_to_display_once").val()
             },
             function(data) {
                 if (data == "Hacking attempt...") {
@@ -716,8 +715,8 @@ function AjouterItem()
 
     //Complete url format
     var url = $("#url").val();
-    if (url.substring(0,7) != "http://" && url!="" && url.substring(0,8) != "https://" && url.substring(0,6) != "ftp://" && url.substring(0,6) != "ssh://") {
-        url = "http://"+url;
+    if (url.indexOf('://') === -1 && url !== '') {
+        url = "https://"+url;
     }
 
     // do checks
@@ -975,9 +974,12 @@ function EditerItem()
 
     //Complete url format
     var url = $("#edit_url").val();
-    if (url.substring(0,7) != "http://" && url!="" && url.substring(0,8) != "https://" && url.substring(0,6) != "ftp://" && url.substring(0,6) != "ssh://") {
-        url = "http://"+url;
+    if (url.indexOf('://') === -1) {
+        url = "https://"+url;
     }
+
+    // Get complexity respected?
+    var complexityIsOk = parseInt($("#edit_mypassword_complex").val()) >= parseInt($("#complexite_groupe").val()) ? true : false;
 
     // do checks
     if ($('#edit_label').val() == "") erreur = "<?php echo addslashes($LANG['error_label']); ?>";
@@ -989,15 +991,16 @@ function EditerItem()
         //Check pw complexity level
         if ((
                 $("#bloquer_modification_complexite").val() == 0 &&
-                parseInt($("#edit_mypassword_complex").val()) >= parseInt($("#complexite_groupe").val())
+                complexityIsOk === true
            )
             ||
             ($("#bloquer_modification_complexite").val() == 1)
             ||
             ($('#recherche_group_pf').val() == 1 && $('#personal_sk_set').val() == 1)
             ||
-            ($("#create_item_without_password").val() === "1" && $("#pw1").val !== "")
-      ) {
+            ($("#create_item_without_password").val() === "1" && $("#pw1").val !== "" && ($("#edit_pw1").val() === '' || complexityIsOk === true))
+        ) {
+
             LoadingPage();  //afficher image de chargement
             var annonce = 0;
             if ($('#edit_annonce').attr('checked')) annonce = 1;
@@ -1305,7 +1308,7 @@ function EditerItem()
 
                         //Prepare clipboard copies
                         if ($('#edit_pw1').val() !== "") {
-                            new Clipboard("#menu_button_copy_pw, #button_quick_pw_copy", {
+                            new ClipboardJS("#menu_button_copy_pw, #button_quick_pw_copy", {
                                 text: function() {
                                     return unsanitizeString($('#edit_pw1').val());
                                 }
@@ -1316,7 +1319,7 @@ function EditerItem()
                             $("#button_quick_pw_copy").addClass("hidden");
                         }
                         if ($('#edit_item_login').val() != "") {
-                            var clipboard_elogin = new Clipboard("#menu_button_copy_login, #button_quick_login_copy", {
+                            var clipboard_elogin = new ClipboardJS("#menu_button_copy_login, #button_quick_login_copy", {
                                 text: function() {
                                     return unsanitizeString($('#edit_item_login').val());
                                 }
@@ -1830,7 +1833,7 @@ function AfficherDetailsItem(id, salt_key_required, expired_item, restricted, di
 
                         //Prepare clipboard copies
                         if (data.pw != "") {
-                            var clipboard_pw = new Clipboard("#menu_button_copy_pw, #button_quick_pw_copy", {
+                            var clipboard_pw = new ClipboardJS("#menu_button_copy_pw, #button_quick_pw_copy", {
                                 text: function() {
                                     return (unsanitizeString(data.pw));
                                 }
@@ -1851,7 +1854,7 @@ function AfficherDetailsItem(id, salt_key_required, expired_item, restricted, di
                             $("#button_quick_pw_copy").addClass("hidden");
                         }
                         if (data.login != "") {
-                            var clipboard_login = new Clipboard("#menu_button_copy_login, #button_quick_login_copy", {
+                            var clipboard_login = new ClipboardJS("#menu_button_copy_login, #button_quick_login_copy", {
                                 text: function() {
                                     return (data.login);
                                 }
@@ -1867,7 +1870,7 @@ function AfficherDetailsItem(id, salt_key_required, expired_item, restricted, di
                         }
                         // #525
                         if (data.url != "") {
-                            var clipboard_url = new Clipboard("#menu_button_copy_url", {
+                            var clipboard_url = new ClipboardJS("#menu_button_copy_url", {
                                 text: function() {
                                     return unsanitizeString(data.url);
                                 }
@@ -1880,7 +1883,7 @@ function AfficherDetailsItem(id, salt_key_required, expired_item, restricted, di
                         }
 
                         //prepare link to clipboard
-                        var clipboard_link = new Clipboard("#menu_button_copy_link", {
+                        var clipboard_link = new ClipboardJS("#menu_button_copy_link", {
                             text: function() {
                                 return "<?php echo $SETTINGS['cpassman_url']; ?>"+"/index.php?page=items&group="+data.folder+"&id="+data.id;
                             }
@@ -2748,7 +2751,9 @@ function refreshTree(node_to_select, do_refresh, refresh_visible_folders)
         });
     }
 
-    if (refresh_visible_folders === 1) {
+    if (refresh_visible_folders === 1
+        && ($('#div_formulaire_edition_item').is(':visible') === false || $('#div_formulaire_saisi').is(':visible') === false)
+    ) {
         $(this).delay(500).queue(function() {
             refreshVisibleFolders();
             $(this).dequeue();
@@ -2839,15 +2844,10 @@ function openReasonToAccess() {
 //###########
 $(function() {
 
-    var clear_tp_clipboard = new Clipboard("#but_empty_clipboard", {
+    var clear_tp_clipboard = new ClipboardJS("#but_empty_clipboard", {
         text: function() {
             return "cleared";
         }
-    });
-    clear_tp_clipboard.on('success', function(e) {
-        $("#message_box").html("super").show().fadeOut(1000);
-
-        e.clearSelection();
     });
 
     $.ajaxSetup({
@@ -3967,6 +3967,22 @@ $(function() {
     });
     //<=
 
+
+    // => OTV LINK
+    $("#dialog_otv").dialog({
+        bgiframe: true,
+        modal: true,
+        height:300,
+        autoOpen: false,
+        minWidth:750,
+        title: "<?php echo addslashes($LANG['request_access_to_item']); ?>",
+        close: function(event,ui) {
+            $(this).dialog('close');
+        }
+    });
+    //<=
+
+
     // => ATTACHMENTS INIT
     var uploader_attachments = new plupload.Uploader({
         runtimes : "html5,flash,silverlight,html4",
@@ -4463,6 +4479,45 @@ if ($SETTINGS['upload_imageresize_options'] == 1) {
         }
     });
 
+    
+    //Simulate a CRON activity (only 5 secs after page loading)
+    setTimeout(
+        function() {
+            $.post(
+                "sources/main.queries.php",
+                {
+                    type    : "save_user_location",
+                    step    : "refresh",
+                    key     : "<?php echo $_SESSION['key']; ?>"
+                },
+                function(data) {
+                    data = prepareExchangedData(data, "decode", "<?php echo $_SESSION['key']; ?>");
+                    if (data.refresh === true) {
+                        // Get user location
+                        var client_info = "";
+                        $.getJSON("https://ipapi.co/json", function() {
+                            // nothing to do
+                        })
+                        .always(function(answered_data) {
+                            if (answered_data.ip !== "") {
+                                $.post(
+                                    "sources/main.queries.php",
+                                    {
+                                        type        : "save_user_location",
+                                        step        : "perform",
+                                        location    : answered_data.country+"-"+answered_data.city+"-"+answered_data.timezone,
+                                        key         : "<?php echo $_SESSION['key']; ?>"
+                                    }
+                                );
+                            }
+                        });
+                    }
+                }
+            );
+        },
+        5000
+    );
+
     //Simulate a CRON activity (only 8 secs after page loading)
     setTimeout(
         function() {
@@ -4644,13 +4699,13 @@ function proceed_list_update(stop_proceeding)
         $("#items_list_loader").addClass("hidden");
 
         // prepare clipboard items
-        clipboard = new Clipboard('.mini_login');
+        clipboard = new ClipboardJS('.mini_login');
         clipboard.on('success', function(e) {
             $("#message_box").html("<?php echo addslashes($LANG['login_copied_clipboard']); ?>").show().fadeOut(1000);
             e.clearSelection();
         });
 
-        clipboard = new Clipboard('.mini_pw');
+        clipboard = new ClipboardJS('.mini_pw');
         clipboard.on('success', function(e) {
             $("#message_box").html("<?php echo addslashes($LANG['pw_copied_clipboard']); ?>").show().fadeOut(1000);
             itemLog(
@@ -4832,6 +4887,7 @@ function manage_history_entry(type, id)
 }
 
 
+
 /*
 * Launch the redirection to OTV page
 */
@@ -4851,30 +4907,15 @@ function prepareOneTimeView()
         function(data) {
             //check if format error
             if (data.error == "") {
-                $("#div_dialog_message").dialog({
-                    height:300,
-                    minWidth:750,
-                    close: function(event,ui) {
-                        $("#div_dialog_message_text").html('');
-                        $(this).dialog('close');
-                    }
-                });
-                $("#div_dialog_message").dialog('open');
-                $("#div_dialog_message_text").html(data.url+
-                    '<div style="margin-top:30px;font-size:13px;text-align:center;"><span id="show_otv_copied" class="ui-state-focus ui-corner-all" style="padding:10px;display:none;"></span></div>'
-                );
-                
-                var clipboard = new Clipboard("#" + data.element_id, {
-                    text: function(trigger) {
-                        return $('#' + data.element_id).data('clipboard-text');
-                    }
-                });
-                clipboard.on('success', function(e) {
-                    $("#show_otv_copied").html("<?php echo addslashes($LANG['link_is_copied']); ?>").show().fadeOut(2000);
-                    e.clearSelection();
-                });
+                var str = "<?php echo addslashes($LANG['one_time_view_item_url_box']);?>";
+                var html = str.replace("#URL#", data.url + '<i class="fa-stack tip otv-link" title="<?php echo addslashes($LANG['copy']);?>" style="cursor:pointer;"><span class="fa fa-square fa-stack-2x"></span><span class="fa fa-clipboard fa-stack-1x fa-inverse"></span></i>');
+                html = html.replace("#DAY#", data.date);
+                $('#dialog_otv_text').html(html);
 
-                $(".tip").tooltipster({multiple: true});
+                $('.tip').tooltipster({multiple: true});
+
+                $('#otv-url').val(data.url);
+                $("#dialog_otv").dialog('open');
             } else {
                 $("#item_history_log_error").html(data.error).show();
             }

@@ -41,14 +41,13 @@ require_once $SETTINGS['cpassman_dir'].'/sources/SplClassLoader.php';
 require_once $SETTINGS['cpassman_dir'].'/sources/main.functions.php';
 require_once $SETTINGS['cpassman_dir'].'/includes/libraries/protect/SuperGlobal/SuperGlobal.php';
 $superGlobal = new protect\SuperGlobal\SuperGlobal();
-
+            
 // Prepare GET variables
 $get_group = $superGlobal->get("group", "GET");
 $get_id = $superGlobal->get("id", "GET");
 
 // Prepare SESSION variables
 $session_user_admin = $superGlobal->get("user_admin", "SESSION");
-
 
 if ($session_user_admin === '1'
     && (isset($SETTINGS_EXT['admin_full_right']) === true && $SETTINGS_EXT['admin_full_right'] === true)
@@ -83,6 +82,7 @@ foreach ($rows as $reccord) {
         $listRoles .= ';'.$reccord['id'].'#'.$reccord['title'];
     }
 }
+
 
 // Hidden things
 echo '
@@ -146,7 +146,8 @@ echo '
 <input type="hidden" id="item_user_token" value="" />
 <input type="hidden" id="items_listing_should_stop" value="" />
 <input type="hidden" id="new_listing_characteristics" value="" />
-<input type="hidden" id="uniqueLoadData" value="" />';
+<input type="hidden" id="uniqueLoadData" value="" />
+<input type="hidden" id="otv-url" value="" />';
 
 echo '
 <div id="div_items">';
@@ -426,7 +427,7 @@ echo '
         <div id="item_tabs">
         <ul>
             <li><a href="#tabs-01">'.$LANG['definition'].'</a></li>
-            <li><a href="#tabs-02">'.$LANG['index_password'].' &amp; '.$LANG['visibility'].'</a></li>
+            <li><a href="#tabs-02">'.$LANG['index_password'].'</a></li>
             <li><a href="#tabs-03">'.$LANG['files_&_images'].'</a></li>
             ', isset($SETTINGS['item_extra_fields']) && $SETTINGS['item_extra_fields'] == 1 ?
             '<li id="form_tab_fields"><a href="#tabs-04">'.$LANG['more'].'</a></li>' : '', '
@@ -1082,5 +1083,11 @@ echo '
         <div id="reason_to_access_info" style="margin-top:5px; padding:4px;"></div>
     </div>
 </div>';
+
+// Alert BOX
+echo '
+    <div id="dialog_otv" style="display:none;">
+        <div id="dialog_otv_text" style="text-align:center; padding:4px; font-size:12px; margin-top:10px;"></div>
+    </div>';
 
 require_once 'items.load.php';
