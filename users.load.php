@@ -1,11 +1,11 @@
 <?php
 /**
- * @file          users.load.php
- * @author        Nils Laumaillé
+ * @package       users.load.php
+ * @author        Nils Laumaillé <nils@teampass.net>
  * @version       2.1.27
- * @copyright     (c) 2009-2018 Nils Laumaillé
- * @licensing     GNU GPL-3.0
- * @link          http://www.teampass.net
+ * @copyright     2009-2018 Nils Laumaillé
+ * @license       GNU GPL-3.0
+ * @link          https://www.teampass.net
  *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -611,15 +611,22 @@ $(function() {
             "<?php echo $LANG['save_button']; ?>": function() {
                 var functions = managedby = allowFld = forbidFld = action_on_user = "";
 
-                // Check if is valid email
-                if (IsValidEmail(sanitizeString($('#user_edit_email').val())) === false) {
-                    $("#user_edit_error")
-                        .html("<?php echo addslashes($LANG['email_format_is_not_correct']); ?>")
-                        .show(1)
-                        .delay(2000)
-                        .fadeOut(1000);
-                    return false;
-                }
+                // Check if email format is ok
+                var verimail = new Comfirm.AlphaMail.Verimail();
+                verimail.verify(
+                    sanitizeString($('#user_edit_email').val()),
+                    function(status, message, suggestion){
+                        if (status < 0) {
+                            // Incorrect syntax!
+                            $("#user_edit_error")
+                                .html("<?php echo addslashes($LANG['email_format_is_not_correct']); ?>")
+                                .show(1)
+                                .delay(2000)
+                                .fadeOut(1000);
+                            return false;
+                        }
+                    }
+                );
 
                 // manage the multiselect boxes
                 $("#user_edit_functions_list option:selected").each(function () {

@@ -1,11 +1,11 @@
 <?php
 /**
- * @file          upgrade.ajax.php
- * @author        Nils Laumaillé
+ * @package       upgrade.ajax.php
+ * @author        Nils Laumaillé <nils@teampass.net>
  * @version       2.1.27
- * @copyright     (c) 2009-2018 Nils Laumaillé
- * @licensing     GNU GPL-3.0
- * @link          http://www.teampass.net
+ * @copyright     2009-2018 Nils Laumaillé
+ * @license       GNU GPL-3.0
+ * @link          https://www.teampass.net
  *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -87,6 +87,30 @@ $superGlobal->put("abspath", $abspath, "SESSION");
 
 // Get Sessions
 $session_tp_defuse_installed = $superGlobal->get("tp_defuse_installed", "SESSION");
+
+/**
+ * Generates a random key
+ *
+ * @return void
+ */
+function generateRandomKey()
+{
+    // load passwordLib library
+    $path = '../includes/libraries/PasswordGenerator/Generator/';
+    include_once $path.'ComputerPasswordGenerator.php';
+
+    $generator = new PasswordGenerator\Generator\ComputerPasswordGenerator();
+
+    $generator->setLength(40);
+    $generator->setSymbols(false);
+    $generator->setLowercase(true);
+    $generator->setUppercase(true);
+    $generator->setNumbers(true);
+
+	$key = $generator->generatePasswords();
+
+    return $key[0];
+}
 
 /**
  * Function permits to get the value from a line
@@ -247,6 +271,19 @@ $res = addColumnIfNotExist(
 );
 if ($res === false) {
     echo '[{"finish":"1", "msg":"", "error":"An error appears when adding field encrypted_data to table categories! '.mysqli_error($db_link).'!"}]';
+    mysqli_close($db_link);
+    exit();
+}
+
+
+// add field is_mandatory to Categories table
+$res = addColumnIfNotExist(
+    $pre."categories",
+    "is_mandatory",
+    "BOOLEAN NOT NULL DEFAULT FALSE"
+);
+if ($res === false) {
+    echo '[{"finish":"1", "msg":"", "error":"An error appears when adding field is_mandatory to table categories! '.mysqli_error($db_link).'!"}]';
     mysqli_close($db_link);
     exit();
 }
@@ -952,6 +989,35 @@ if (intval($tmp) === 0) {
 }
 
 
+// add new admin setting "upload_zero_byte_file"
+$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `".$pre."misc` WHERE type = 'admin' AND intitule = 'upload_zero_byte_file'"));
+if (intval($tmp) === 0) {
+    mysqli_query(
+        $db_link,
+        "INSERT INTO `".$pre."misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'upload_zero_byte_file', '0')"
+    );
+}
+
+
+// add new admin setting "upload_all_extensions_file"
+$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `".$pre."misc` WHERE type = 'admin' AND intitule = 'upload_all_extensions_file'"));
+if (intval($tmp) === 0) {
+    mysqli_query(
+        $db_link,
+        "INSERT INTO `".$pre."misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'upload_all_extensions_file', '0')"
+    );
+}
+
+
+// generate new backup key
+mysqli_query(
+    $db_link,
+    "UPDATE `".$pre."misc`
+    SET valeur = '".generateRandomKey()."'
+    WHERE type = 'admin' AND intitule = 'bck_script_passkey'"
+);
+
+
 
 // alter table NESTEED_TREE to INT(5) on field "renewal_period"
 mysqli_query(
@@ -993,6 +1059,18 @@ if ($res === false) {
     mysqli_close($db_link);
     exit();
 }
+
+
+// add new table for templates
+mysqli_query(
+    $db_link,
+    "CREATE TABLE IF NOT EXISTS `".$pre."templates` (
+    `increment_id` int(12) NOT NULL AUTO_INCREMENT,
+    `item_id` int(12) NOT NULL,
+    `category_id` int(12) NOT NULL,
+    PRIMARY KEY (`increment_id`)
+    ) CHARSET=utf8;"
+);
 
 
 
@@ -1076,6 +1154,19 @@ $res = addColumnIfNotExist(
 );
 if ($res === false) {
     echo '[{"finish":"1", "msg":"", "error":"An error appears when adding field role_visibility to table CATEGORIES! '.mysqli_error($db_link).'!"}]';
+    mysqli_close($db_link);
+    exit();
+}
+
+
+// add field is_mandatory to CATEGORIES table
+$res = addColumnIfNotExist(
+    $pre."categories",
+    "is_mandatory",
+    "tinyint(1) NOT NULL DEFAULT '0'"
+);
+if ($res === false) {
+    echo '[{"finish":"1", "msg":"", "error":"An error appears when adding field is_mandatory to table CATEGORIES! '.mysqli_error($db_link).'!"}]';
     mysqli_close($db_link);
     exit();
 }

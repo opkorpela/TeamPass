@@ -21,6 +21,8 @@ services:
       - backend
     volumes:
       - ./volumes/teampass:/var/www/html
+    ports:
+      - "8088:80"
 
   db:
     restart: always
@@ -34,6 +36,8 @@ services:
       - ./volumes/db:/var/lib/mysql
     networks:
       - backend
+    ports:
+      - "13306:3306"
 
 networks:
   frontend:

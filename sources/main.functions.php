@@ -1,11 +1,11 @@
 <?php
 /**
  *
- * @file          main.functions.php
- * @author        Nils Laumaillé
+ * @package       main.functions.php
+ * @author        Nils Laumaillé <nils@teampass.net>
  * @version       2.1.27
- * @copyright     (c) 2009-2018 Nils Laumaillé
- * @licensing     GNU GPL-3.0
+ * @copyright     2009-2018 Nils Laumaillé
+ * @license       GNU GPL-3.0
  * @link
  */
 
@@ -25,7 +25,7 @@ if (!isset($SETTINGS['cpassman_dir']) || empty($SETTINGS['cpassman_dir'])) {
     } elseif (file_exists('../../includes/config/tp.config.php')) {
         include_once '../../includes/config/tp.config.php';
     } else {
-        throw new Exception("Error file '/includes/config/tp.config.php' not exists", 1);
+        //throw new Exception("Error file '/includes/config/tp.config.php' not exists", 1);
     }
 }
 
@@ -1214,7 +1214,7 @@ function getStatisticsData()
  * @param  array  $LANG        Language
  * @param  array  $SETTINGS    settings
  * @param  string $textMailAlt email message alt
- * @return  string  some json info
+ * @return string some json info
  */
 function sendEmail(
     $subject,
@@ -1233,13 +1233,13 @@ function sendEmail(
     include $SETTINGS['cpassman_dir'].'/includes/config/settings.php';
 
     // Load superglobal
-    require_once $SETTINGS['cpassman_dir'].'/includes/libraries/protect/SuperGlobal/SuperGlobal.php';
+    include_once $SETTINGS['cpassman_dir'].'/includes/libraries/protect/SuperGlobal/SuperGlobal.php';
     $superGlobal = new protect\SuperGlobal\SuperGlobal();
 
     // Get user language
     $session_user_language = $superGlobal->get("user_language", "SESSION");
     $user_language = isset($session_user_language) ? $session_user_language : "english";
-    require_once $SETTINGS['cpassman_dir'].'/includes/language/'.$user_language.'.php';
+    include_once $SETTINGS['cpassman_dir'].'/includes/language/'.$user_language.'.php';
 
     // Load library
     include_once $SETTINGS['cpassman_dir'].'/sources/SplClassLoader.php';
@@ -1258,8 +1258,8 @@ function sendEmail(
             $mail->SMTPSecure = $SETTINGS['email_security'];
             $SMTPAutoTLS = true;
         } else {
-            $SMTPAutoTLS = false;
             $mail->SMTPSecure = "";
+            $SMTPAutoTLS = false;
         }
         $mail->SMTPAutoTLS = $SMTPAutoTLS;
         $mail->isSmtp(); // send via SMTP
@@ -1271,9 +1271,10 @@ function sendEmail(
         $mail->FromName = $SETTINGS['email_from_name'];
 
         // Prepare for each person
-        $dests = explode(",", $email);
-        foreach ($dests as $dest) {
-            $mail->addAddress($dest);
+        foreach (explode(",", $email) as $dest) {
+            if (empty($dest) === false) {
+                $mail->addAddress($dest);
+            }
         }
 
         // Prepare HTML
@@ -1304,20 +1305,31 @@ function sendEmail(
         $mail->isHtml(true); // send as HTML
         $mail->Subject = $subject;
         $mail->Body = $text_html;
-        if (is_null($textMailAlt) === false) {
-            $mail->AltBody = $textMailAlt;
-        } else {
-            $mail->AltBody = '';
-        }
+        $mail->AltBody = (is_null($textMailAlt) === false) ? $textMailAlt : '';
+        
         // send email
-        if (!$mail->send()) {
-            return '"error":"error_mail_not_send" , "message":"'.str_replace(array("\n", "\t", "\r"), '', $mail->ErrorInfo).'"';
+        if ($mail->send()) {
+            return json_encode(
+                array(
+                    "error" => "",
+                    "message" => $LANG['forgot_my_pw_email_sent']
+                )
+            );
         } else {
-            return '"error":"" , "message":"'.$LANG['forgot_my_pw_email_sent'].'"';
+            return json_encode(
+                array(
+                    "error" => "error_mail_not_send",
+                    "message" => str_replace(array("\n", "\t", "\r"), '', $mail->ErrorInfo)
+                )
+            );
         }
     } catch (Exception $e) {
-        return '"error":"error_mail_not_send" , '.
-        '"message":"'.str_replace(array("\n", "\t", "\r"), '', $mail->ErrorInfo).'"';
+        return json_encode(
+            array(
+                "error" => "error_mail_not_send",
+                "message" => str_replace(array("\n", "\t", "\r"), '', $mail->ErrorInfo)
+            )
+        );
     }
 }
 
@@ -1614,7 +1626,13 @@ function logItems(
 ) {
     global $server, $user, $pass, $database, $port, $encoding;
     global $SETTINGS;
+    global $LANG;
     $dataItem = '';
+
+    // Exit if no item ID
+    if (empty($item_id) === true) {
+        return false;
+    }
 
     // include librairies & connect to DB
     include_once $SETTINGS['cpassman_dir'].'/includes/libraries/Database/Meekrodb/db.class.php';
@@ -1672,9 +1690,10 @@ function logItems(
     if (isset($SETTINGS['enable_email_notification_on_item_shown']) === true
         && $SETTINGS['enable_email_notification_on_item_shown'] === '1'
         && $action === 'at_shown'
+        && isset($_SESSION['listNotificationEmails']) === true
     ) {
         // Get info about item
-        if (empty($dataItem) === true && empty($item_label) === true) {
+        if (empty($dataItem) === true || empty($item_label) === true) {
             $dataItem = DB::queryfirstrow(
                 "SELECT id, id_tree, label
                 FROM ".prefix_table("items")."
@@ -1693,7 +1712,7 @@ function logItems(
                 'body' => str_replace(
                     array('#tp_user#', '#tp_item#', '#tp_link#'),
                     array(
-                        addslashes($_SESSION['login']),
+                        isset($_SESSION['login']) === true ? addslashes($_SESSION['login']) : 'OTV',
                         addslashes($item_label),
                         $SETTINGS['cpassman_url']."/index.php?page=items&group=".$dataItem['id_tree']."&id=".$dataItem['id']
                     ),
@@ -2212,7 +2231,7 @@ function fileDelete($file)
  * @param  string $file File name
  * @return string
  */
-function getFileExtension(string $file)
+function getFileExtension($file)
 {
     if (strpos($file, '.') === false) {
         return $file;
@@ -2227,7 +2246,7 @@ function getFileExtension(string $file)
  * @param  string $type What clean to perform
  * @return string
  */
-function cleanText(string $string, $type = null)
+function cleanText($string, $type = null)
 {
     global $SETTINGS;
 

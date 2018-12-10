@@ -1,12 +1,12 @@
 <?php
 /**
  *
- * @file          admin.settings.php
- * @author        Nils Laumaillé
+ * @package       admin.settings.php
+ * @author        Nils Laumaillé <nils@teampass.net>
  * @version       2.1.27
- * @copyright     (c) 2009-2018 Nils Laumaillé
- * @licensing     GNU GPL-3.0
- * @link          http://www.teampass.net
+ * @copyright     2009-2018 Nils Laumaillé
+ * @license       GNU GPL-3.0
+ * @link          https://www.teampass.net
  *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -22,9 +22,9 @@ if (!isset($_SESSION['CPM']) || $_SESSION['CPM'] != 1 ||
 
 // Load config
 if (file_exists('../includes/config/tp.config.php')) {
-    require_once '../includes/config/tp.config.php';
+    include_once '../includes/config/tp.config.php';
 } elseif (file_exists('./includes/config/tp.config.php')) {
-    require_once './includes/config/tp.config.php';
+    include_once './includes/config/tp.config.php';
 } else {
     throw new Exception("Error file '/includes/config/tp.config.php' not exists", 1);
 }
@@ -1603,6 +1603,36 @@ echo '
                     </td><td>
                     <input type="text" size="5" id="upload_maxfilesize" name="upload_maxfilesize" value="', isset($SETTINGS['upload_maxfilesize']) ? $SETTINGS['upload_maxfilesize'] : '10', '" class="text ui-widget-content" onchange="updateSetting($(this).attr(\'id\'));" />
                 </td></tr>';
+
+// upload_zero_byte_file
+echo '
+                <tr style="margin-bottom:3px">
+                    <td>
+                        <i class="fa fa-chevron-right mi-grey-1" style="margin-right: .3em;">&nbsp;</i>
+                        <label>' .
+                        $LANG['upload_empty_file'].'
+                        </label>
+                    </td>
+                    <td>
+                        <div class="toggle toggle-modern" id="upload_zero_byte_file" data-toggle-on="', isset($SETTINGS['upload_zero_byte_file']) && $SETTINGS['upload_zero_byte_file'] == 1 ? 'true' : 'false', '"></div><input type="hidden" id="upload_zero_byte_file_input" name="upload_zero_byte_file_input" value="', isset($SETTINGS['upload_zero_byte_file']) && $SETTINGS['upload_zero_byte_file'] == 1 ? '1' : '0', '" />
+                    </td>
+                </tr>';
+
+// upload_all_extensions_file
+echo '
+                <tr style="margin-bottom:3px">
+                    <td>
+                        <i class="fa fa-chevron-right mi-grey-1" style="margin-right: .3em;">&nbsp;</i>
+                        <label>' .
+                        $LANG['upload_any_extension_file'].'
+                        &nbsp;<i class="fa fa-question-circle tip" title="'.htmlentities(strip_tags($LANG['upload_any_extension_file_tip']), ENT_QUOTES).'"></i>
+                        </label>
+                    </td>
+                    <td>
+                        <div class="toggle toggle-modern" id="upload_all_extensions_file" data-toggle-on="', isset($SETTINGS['upload_all_extensions_file']) && $SETTINGS['upload_all_extensions_file'] == 1 ? 'true' : 'false', '"></div><input type="hidden" id="upload_all_extensions_file_input" name="upload_all_extensions_file_input" value="', isset($SETTINGS['upload_all_extensions_file']) && $SETTINGS['upload_all_extensions_file'] == 1 ? '1' : '0', '" />
+                    </td>
+                </tr>';
+
 // Extension for Documents
 echo '
                 <tr><td>
@@ -1643,6 +1673,7 @@ echo '
                     </td><td>
                     <input type="text" size="70" id="upload_otherext" name="upload_otherext" value="', isset($SETTINGS['upload_otherext']) ? $SETTINGS['upload_otherext'] : 'sql,xml', '" class="text ui-widget-content" onchange="updateSetting($(this).attr(\'id\'));" />
                 </td></tr>';
+
 echo '<tr><td colspan="3"><hr /></td></tr>';
 // Image resize width / height / quality
 echo '

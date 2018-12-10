@@ -1,11 +1,11 @@
 <?php
 /**
- * @file          install.queries.php
- * @author        Nils Laumaillé
+ * @package       install.queries.php
+ * @author        Nils Laumaillé <nils@teampass.net>
  * @version       2.1.27
- * @copyright     (c) 2009-2018 Nils Laumaillé
- * @licensing     GNU GPL-3.0
- * @link          http://www.teampass.net
+ * @copyright     2009-2018 Nils Laumaillé
+ * @license       GNU GPL-3.0
+ * @link          https://www.teampass.net
  *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -66,6 +66,30 @@ function bCrypt($password, $cost)
         }
     }
     return crypt($password, $salt);
+}
+
+/**
+ * Generates a random key
+ *
+ * @return void
+ */
+function generateRandomKey()
+{
+    // load passwordLib library
+    $path = '../includes/libraries/PasswordGenerator/Generator/';
+    include_once $path.'ComputerPasswordGenerator.php';
+
+    $generator = new PasswordGenerator\Generator\ComputerPasswordGenerator();
+
+    $generator->setLength(40);
+    $generator->setSymbols(false);
+    $generator->setLowercase(true);
+    $generator->setUppercase(true);
+    $generator->setNumbers(true);
+
+	$key = $generator->generatePasswords();
+
+    return $key[0];
 }
 
 /**
@@ -518,7 +542,10 @@ global \$SETTINGS;
                             array('admin', 'offline_key_level', '0'),
                             array('admin', 'enable_http_request_login', '0'),
                             array('admin', 'ldap_and_local_authentication', '0'),
-                            array('admin', 'secure_display_image', '1')
+                            array('admin', 'secure_display_image', '1'),
+                            array('admin', 'upload_zero_byte_file', '0'),
+                            array('admin', 'upload_all_extensions_file', '0'),
+                            array('admin', 'bck_script_passkey', generateRandomKey())
                         );
                         foreach ($aMiscVal as $elem) {
                             //Check if exists before inserting
@@ -887,6 +914,7 @@ global \$SETTINGS;
                             `order` int(12) NOT NULL default '0',
                             `encrypted_data` tinyint(1) NOT NULL default '1',
                             `role_visibility` varchar(255) NOT NULL DEFAULT 'all',
+                            `is_mandatory` tinyint(1) NOT NULL DEFAULT '0',
                             PRIMARY KEY (`id`)
                             ) CHARSET=utf8;"
                         );
@@ -900,6 +928,7 @@ global \$SETTINGS;
                             `data` text NOT NULL,
                             `data_iv` text NOT NULL,
                             `encryption_type` VARCHAR(20) NOT NULL DEFAULT 'not_set',
+                            `is_mandatory` BOOLEAN NOT NULL DEFAULT FALSE ,
                             PRIMARY KEY (`id`)
                             ) CHARSET=utf8;"
                         );
@@ -1002,6 +1031,16 @@ global \$SETTINGS;
                             `user_id` int(12) NOT NULL,
                             `timestamp` varchar(50) NOT NULL DEFAULT 'none',
                             PRIMARY KEY (`id`)
+                            ) CHARSET=utf8;"
+                        );
+                    } elseif ($task === "templates") {
+                        $mysqli_result = mysqli_query(
+                            $dbTmp,
+                            "CREATE TABLE IF NOT EXISTS `".$var['tbl_prefix']."templates` (
+                            `increment_id` int(12) NOT NULL AUTO_INCREMENT,
+                            `item_id` int(12) NOT NULL,
+                            `category_id` int(12) NOT NULL,
+                            PRIMARY KEY (`increment_id`)
                             ) CHARSET=utf8;"
                         );
                     }

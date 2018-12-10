@@ -1,11 +1,11 @@
 <?php
 /**
- * @file          roles.queries.php
- * @author        Nils Laumaillé
+ * @package       roles.queries.php
+ * @author        Nils Laumaillé <nils@teampass.net>
  * @version       2.1.27
- * @copyright     (c) 2009-2018 Nils Laumaillé
- * @licensing     GNU GPL-3.0
- * @link          http://www.teampass.net
+ * @copyright     2009-2018 Nils Laumaillé
+ * @license       GNU GPL-3.0
+ * @link          https://www.teampass.net
  *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -23,9 +23,9 @@ if (!isset($_SESSION['CPM']) || $_SESSION['CPM'] != 1 ||
 
 // Load config
 if (file_exists('../includes/config/tp.config.php')) {
-    require_once '../includes/config/tp.config.php';
+    include_once '../includes/config/tp.config.php';
 } elseif (file_exists('./includes/config/tp.config.php')) {
-    require_once './includes/config/tp.config.php';
+    include_once './includes/config/tp.config.php';
 } else {
     throw new Exception("Error file '/includes/config/tp.config.php' not exists", 1);
 }
@@ -291,7 +291,9 @@ if (null !== filter_input(INPUT_POST, 'type', FILTER_SANITIZE_STRING)) {
             $post_filter = filter_input(INPUT_POST, 'filter', FILTER_SANITIZE_STRING);
 
             $tree = $tree->getDescendants();
-            $texte = '<table><thead><tr><th>'.$LANG['groups'].'</th>';
+            $texte = '<table><thead><tr><th><div>'.addslashes($LANG['groups']).'</div><div>'.
+                '<input type="text" placeholder="'.addslashes($LANG['filter']).'" id="filter_folders" />'.
+                '&nbsp<span class="fa fa-eraser mi-red pointer eraser"></span></div></th>';
             $gpes_ok = array();
             $gpes_nok = array();
             $arrRolesTitle = array();
@@ -379,7 +381,7 @@ if (null !== filter_input(INPUT_POST, 'type', FILTER_SANITIZE_STRING)) {
                     }
 
                     //display 1st cell of the line
-                    $texte .= '<tr><td style=\'font-size:10px; font-family:arial;\' title=\'ID='.$node->id.'\'>'.$ident." ".$node->title.'</td>';
+                    $texte .= '<tr><td style=\'font-size:10px; font-family:arial;\' class="folder-name" title=\'ID='.$node->id.'\'>'.$ident." ".$node->title.'</td>';
 
                     foreach ($arrRoles as $role) {
                         //check if this role has access or not

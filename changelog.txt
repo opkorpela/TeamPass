@@ -1,5 +1,42 @@
 2.1.27
+17/
+ #2349 Folder with flag "allow empty password" says "Insufficient password strenght" on item edition
+ #2347 Disable "Forgot Password?" link feature not working
+ #2346 [CSV-Import] convert field to string bevore using replace()
+ #2345 restore, enter decrypt key then system logs out
+ #2341 API - Incorrect update item parameters decoding
+ #2334 error adding entry with the same name then another entry in a different folder
+ #2314 SQL error in API near user name
+ #2312 API Issue adding folder on root
+ #2290 Protection of OTV page errors
+ #2298 support for login through http header
+ #2265 API - Add item - comma separated base64 encoded string
+ 
+16/
+ New - Added folders filter in Manage Roles page
+ New - Added folders alphabet filter in Manage Folders page
+ #2279 Google Authentication no link
+ #2277 Import fails when Login: / Account: has a backslash inside of it
+ #2274 Import from csv-list includes items that are marked as already imported
+ #2263 New upload settings to permit empty files and/or any extensions to be uploaded
+
+15/
+ #2266 Google 2FA mail for temporary code is blank
+
+14/
+ Fix for missing install/upgrade instructions
+
+13/
+ New - Templating system based upon Custom Fields
+ #2256 User can select his 2FA methods if several selected
+ #2253 Google Authenticator not working
+   Item suggestion is not available from Regular User
+ #2246 Copy folder does not copy rights structure
+ #2245 TeamPass 2FA QR Code won't show after providing activiation code
+ #2244 html entities get interpreted inside passwords
+
 12/
+ New - Templating system based upon Custom Fields
  Added new option permitting to enable secure image preview
  Added warning to user if login attempts identified since last successful connection
  Added Yubico support for 2FA authentication
@@ -10,6 +47,12 @@
  Improved log in case of failed authentication - used login is shown
  Improved syslog message format
  Updated library PHPMailer to 5.5
+ #2256 User can select his 2FA methods if several selected
+ #2253 Google Authenticator not working
+ #2248 Item suggestion is not available from Regular User
+ #2246 Copy folder does not copy rights structure
+ #2245 TeamPass 2FA QR Code won't show after providing activiation code
+ #2244 html entities get interpreted inside passwords
  #2223 Error while using php v5.6
  #2206 New ldap user and ad password change
  #2204 Password copy - cryptic log entry using syslog
