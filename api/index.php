@@ -44,6 +44,12 @@ switch ($method) {
     case 'PUT':
         restPut();
         break;
+    case 'POST':
+        restPost();
+        break;
+    case 'POST':
+    rest_post();
+    break;
     case 'DELETE':
         restDelete();
         break;
