@@ -973,10 +973,14 @@ function identifyUser(
         exit();
     }
 
+    if ($username === "admin") {
+        $proceedIdentification = true;
+    }
+
     // check GA code
     if (isset($SETTINGS['google_authentication']) === true
         && $SETTINGS['google_authentication'] === '1'
-        && ($username !== "admin" || ((int) $SETTINGS['admin_2fa_required'] === 1 && $username === "admin"))
+        && $username !== "admin"
         && $user_2fa_selection === 'google'
     ) {
         if (isset($dataReceived['GACode']) && empty($dataReceived['GACode']) === false) {
@@ -1035,7 +1039,6 @@ function identifyUser(
             "Proceed with Ident: ".$proceedIdentification."\n"
         );
     }
-
 
     // check AGSES code
     if (isset($SETTINGS['agses_authentication_enabled']) === true

@@ -814,7 +814,7 @@ $tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `".$pre."misc` WHER
 if (intval($tmp) === 0) {
     mysqli_query(
         $db_link,
-        "INSERT INTO `".$pre."misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'admin_2fa_required', '1')"
+        "INSERT INTO `".$pre."misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'admin_2fa_required', '0')"
     );
 }
 

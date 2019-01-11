@@ -546,7 +546,7 @@ global \$SETTINGS;
                             array('admin', 'upload_zero_byte_file', '0'),
                             array('admin', 'upload_all_extensions_file', '0'),
                             array('admin', 'bck_script_passkey', generateRandomKey()),
-                            array('admin', 'admin_2fa_required', '1'),
+                            array('admin', 'admin_2fa_required', '0'),
                         );
                         foreach ($aMiscVal as $elem) {
                             //Check if exists before inserting
